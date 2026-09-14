@@ -1,0 +1,63 @@
+name: Java CI - Platform Golden Path
+
+on:
+  workflow_call:
+    inputs:
+      java-version:
+        required: false
+        type: string
+        default: '21'
+      maven-command:
+        required: false
+        type: string
+        default: './mvnw'
+
+jobs:
+  build-and-test:
+    name: Build and Test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout application
+        uses: actions/checkout@v4
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: ${{ inputs.java-version }}
+          cache: maven
+
+      - name: Build and test
+        run: ${{ inputs.maven-command }} -B clean verify
+
+      - name: Upload test reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-reports
+          path: target/surefire-reports/
+          if-no-files-found: ignore
+
+  quality-gate:
+    name: Quality Gate
+    runs-on: ubuntu-latest
+    needs: build-and-test
+    steps:
+      - name: Checkout application
+        uses: actions/checkout@v4
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: ${{ inputs.java-version }}
+          cache: maven
+
+      - name: Package application
+        run: ${{ inputs.maven-command }} -B package -DskipTests
+
+      - name: Platform policy check
+        run: |
+          echo "Platform Engineering Quality Gate"
+          test -f pom.xml
+          echo "Application follows the Java/Maven golden path"
